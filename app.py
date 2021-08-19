@@ -1,8 +1,5 @@
-from flask import Flask, render_template, Blueprint
 from views.main import Main, Error
 import logging
-from flask import current_app
-from werkzeug.local import LocalProxy
 from flask import Flask
 
 app = Flask(__name__)

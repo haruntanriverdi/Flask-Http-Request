@@ -9,29 +9,26 @@ Error = Blueprint('errors', __name__)
 
 LOG = logging.getLogger(__name__)
 
-
 @Main.route('/')
 def index():
     return render_template('index.html')
-
 
 @Error.app_errorhandler(404)
 def handle_404(err):
     return render_template('404.html'), 404
 
-
 @Main.route('/api', methods=['GET'])
 def api_id():
-    # Check if an ID was provided as part of the URL.
-    # If ID is provided, assign it to a variable.
-    # If no ID is provided, display an error in the browser.
+    # Check if an address was provided as part of the URL.
+    # If address is provided, assign it to a variable.
+    # If no address is provided, display an error in the browser.
     if 'address' in request.args:
-
         address = str(request.args['address'])
     else:
         status_code = Response(status=400)
         return jsonify(status_code=status_code.status_code, description="Please specify address")
 
+    # Some variables
     mkad_km = [
         [1, 37.842762, 55.774558],
         [2, 37.842789, 55.76522],
@@ -145,6 +142,7 @@ def api_id():
     address_lot_lan = []
     distance_dict = {}
 
+    # Radius calculation
     def radius(
             B):  # https://stackoverflow.com/questions/56420909/calculating-the-radius-of-earth-by-latitude-in-python-replicating-a-formula
         B = radians(B)  # converting into radians
@@ -157,6 +155,7 @@ def api_id():
         R = sqrt((c + d) / (e + f))
         return R
 
+    # Yandex API url
     base = "https://geocode-maps.yandex.ru/1.x/"
     method = "?apikey=acd75d9c-3e83-4bd1-a118-27af4e1866ec&geocode={}&lang=en_RU".format(address)
     uri = base + method
@@ -165,10 +164,14 @@ def api_id():
     string_xml = result.content
 
     root = ET.fromstring(string_xml)
+
+    # Parsing xml
     for found in root.iter('{http://maps.yandex.ru/geocoder/1.x}found'):
         yandex_status = found.text
     for i in root.iter('{http://maps.yandex.ru/geocoder/1.x}text'):
         full_address = i.text
+
+    # If 1 address is found
     if yandex_status == "1":
         status_code = Response(status=200)
         for child in root.iter("{http://www.opengis.net/gml}pos"):
@@ -182,6 +185,7 @@ def api_id():
         else:
             R = radius(address_lot_lan[1])
 
+            # Calculate distance with haversine formula for every mkad coordinates
             for coord in mkad_km:
                 lon1 = radians(coord[1])
                 lat1 = radians(coord[2])
@@ -194,10 +198,7 @@ def api_id():
                 a = sin(dlat / 2) ** 2 + cos(lat1) * cos(lat2) * sin(dlon / 2) ** 2
                 c = 2 * atan2(sqrt(a), sqrt(1 - a))
                 distance = R * c
-
                 distance_dict[coord[0]] = distance
-
-            # print(test_dict)
 
             a, b = min(distance_dict.items(), key=lambda x: x[1])
 
@@ -207,6 +208,7 @@ def api_id():
                            coordinates=address_lot_lan)
 
     else:
+        # If the address are invalid
         LOG.error('Invalid address input')
         status_code = Response(status=400)
         return jsonify(description="Invalid address input", status_code=status_code.status_code)
